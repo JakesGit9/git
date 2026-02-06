@@ -3,554 +3,791 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Refresh - Archive Protocol</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>THE PEEPHOLE: APARTMENT 402</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
-        :root {
-            --terminal-green: #33ff00;
-            --terminal-dim: #1a8000;
-            --terminal-bg: #051005;
-            --alert-red: #ff3333;
-        }
-
         body {
-            background-color: #000;
-            color: var(--terminal-green);
-            font-family: 'VT323', monospace;
-            overflow: hidden;
-            height: 100vh;
             margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Courier New', Courier, monospace;
             user-select: none;
+            color: #ccc;
         }
 
-        /* CRT Effect Overlay */
-        .scanlines {
-            position: fixed;
+        #game-container {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: linear-gradient(
-                to bottom,
-                rgba(255,255,255,0),
-                rgba(255,255,255,0) 50%,
-                rgba(0,0,0,0.2) 50%,
-                rgba(0,0,0,0.2)
-            );
-            background-size: 100% 4px;
-            z-index: 50;
-            pointer-events: none;
+            z-index: 1;
         }
 
-        .crt-flicker {
-            animation: flicker 0.15s infinite;
-            opacity: 0.95;
-            pointer-events: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(18, 16, 16, 0.1);
-            z-index: 49;
-        }
-
-        /* Glitch Animations */
-        @keyframes flicker {
-            0% { opacity: 0.97; }
-            5% { opacity: 0.85; }
-            10% { opacity: 0.95; }
-            15% { opacity: 0.99; }
-            20% { opacity: 0.90; }
-            50% { opacity: 0.95; }
-            80% { opacity: 0.85; }
-            100% { opacity: 0.95; }
-        }
-
-        @keyframes glitch-skew {
-            0% { transform: skew(0deg); }
-            20% { transform: skew(-2deg); }
-            40% { transform: skew(2deg); }
-            60% { transform: skew(0deg); }
-            80% { transform: skew(-1deg); }
-            100% { transform: skew(0deg); }
-        }
-
-        .text-glitch {
-            animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
-            color: var(--alert-red);
-            text-shadow: 2px 0 #fff;
-        }
-
-        .shake-hard {
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
-
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
-        }
-
-        /* UI Elements */
-        .btn-purge {
-            background: transparent;
-            border: 2px solid var(--terminal-green);
-            color: var(--terminal-green);
-            transition: all 0.1s;
-        }
-        .btn-purge:hover {
-            background: var(--terminal-green);
-            color: black;
-            cursor: crosshair;
-        }
-        .btn-purge:active {
-            transform: scale(0.98);
-        }
-
-        .chat-message {
-            margin-bottom: 0.5rem;
-            opacity: 0;
-            animation: fadeIn 0.5s forwards;
-            border-left: 2px solid transparent;
-            padding-left: 5px;
-        }
+        /* --- POST PROCESSING & OVERLAYS --- */
         
-        .chat-system { color: #888; }
-        .chat-ai { color: var(--alert-red); border-left-color: var(--alert-red); }
-
-        @keyframes fadeIn { to { opacity: 1; } }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: var(--terminal-dim); }
-        ::-webkit-scrollbar-thumb:hover { background: var(--terminal-green); }
-
-        #noise-canvas {
+        #vignette {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            opacity: 0.05;
             pointer-events: none;
-            z-index: 1;
+            background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.6) 60%, black 95%);
+            z-index: 10;
         }
+
+        #peephole-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 15%, rgba(0,0,0,0.9) 25%, black 70%);
+            z-index: 11;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            z-index: 12;
+            opacity: 0.5;
+        }
+
+        /* --- UI ELEMENTS --- */
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #status-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: bold;
+            color: #aaa;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        #interaction-prompt {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px black;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        #controls {
+            pointer-events: auto;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            padding-bottom: 50px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn {
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            border: 2px solid #555;
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 1.2rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: 0.2s;
+        }
+        .btn:hover { background: #fff; color: #000; border-color: #fff; }
+        
+        .btn-safe { border-color: #2a2; color: #afa; }
+        .btn-safe:hover { background: #2a2; color: #000; }
+        
+        .btn-danger { border-color: #a22; color: #faa; }
+        .btn-danger:hover { background: #a22; color: #000; }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #080808;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 { font-size: 3rem; margin-bottom: 10px; color: #c00; letter-spacing: 5px; }
+        p { color: #888; max-width: 600px; line-height: 1.6; font-size: 1.1rem; }
+        b { color: #fff; }
+
+        #jumpscare {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            z-index: 200;
+            display: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #jumpscare img { width: 80%; height: auto; filter: contrast(200%) grayscale(100%); }
+
+        .knocking-text {
+            animation: shake 0.5s infinite;
+            color: #f00;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(0,0); }
+            25% { transform: translate(2px,2px); }
+            50% { transform: translate(-2px, -2px); }
+            75% { transform: translate(-2px, 2px); }
+            100% { transform: translate(2px, -2px); }
+        }
+
     </style>
 </head>
-<body class="flex items-center justify-center">
+<body>
 
-    <!-- Start Overlay -->
-    <div id="start-overlay" class="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center text-center p-4">
-        <h1 class="text-6xl mb-4 tracking-widest text-green-500">THE REFRESH</h1>
-        <p class="text-xl mb-8 max-w-md text-gray-400">
-            EMPLOYEE ID: 402<br>
-            SHIFT: NIGHT<br>
-            TASK: PURGE CORRUPTED ARCHIVES
-        </p>
-        <p class="text-red-500 text-sm mb-8 animate-pulse">WARNING: HEADPHONES RECOMMENDED. CONTAINS FLASHING LIGHTS.</p>
-        <button onclick="startGame()" class="px-8 py-3 border-2 border-green-500 text-green-500 hover:bg-green-900 hover:text-white text-2xl uppercase tracking-widest transition-colors">
-            Initialize System
-        </button>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+    <div id="peephole-overlay"></div>
+
+    <!-- Jumpscare container (SVG face) -->
+    <div id="jumpscare" class="hidden">
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+            <rect width="100" height="100" fill="black"/>
+            <circle cx="30" cy="40" r="10" fill="white"/>
+            <circle cx="70" cy="40" r="10" fill="white"/>
+            <circle cx="30" cy="40" r="2" fill="black"/>
+            <circle cx="70" cy="40" r="2" fill="black"/>
+            <path d="M 20 70 Q 50 90 80 70" stroke="white" stroke-width="5" fill="none"/>
+        </svg>
     </div>
 
-    <!-- CRT Effects -->
-    <div class="scanlines"></div>
-    <div class="crt-flicker"></div>
-    <canvas id="noise-canvas"></canvas>
-
-    <!-- Main Game Container -->
-    <div id="game-container" class="relative w-full max-w-6xl h-[90vh] border border-green-900 bg-black/80 grid grid-cols-12 gap-4 p-6 shadow-[0_0_50px_rgba(51,255,0,0.1)] opacity-0 transition-opacity duration-1000">
-        
-        <!-- Header -->
-        <div class="col-span-12 flex justify-between items-end border-b border-green-900 pb-2 mb-2">
-            <div>
-                <h2 class="text-2xl font-bold">ARCHIVE_PROTOCOL_V.0.9</h2>
-                <span class="text-sm text-green-700">SERVER: DEFUNCT_NODE_7</span>
-            </div>
-            <div class="text-right">
-                <div id="clock" class="text-xl">00:00:00</div>
-                <div class="text-sm text-red-500 animate-pulse hidden" id="connection-warning">! UNSTABLE CONNECTION !</div>
-            </div>
+    <!-- UI -->
+    <div id="ui-layer">
+        <div id="status-bar">
+            <span id="clock">12:00 AM</span>
+            <span id="sanity">SANITY: 100%</span>
         </div>
 
-        <!-- Left Sidebar: Chat & Logs -->
-        <div class="col-span-3 flex flex-col border-r border-green-900 pr-4 h-full overflow-hidden">
-            <div class="bg-green-900/10 p-2 mb-4">
-                <h3 class="text-lg underline mb-2">MODERATOR LOG</h3>
-                <div id="chat-box" class="h-64 overflow-y-auto text-sm font-mono flex flex-col-reverse">
-                    <!-- Chat messages appear here -->
-                </div>
-            </div>
-            
-            <div class="mt-auto">
-                <h3 class="text-lg mb-1">SYSTEM STATUS</h3>
-                <div class="w-full bg-gray-900 h-4 border border-green-800 mb-2">
-                    <div id="sanity-bar" class="h-full bg-green-600 w-full transition-all duration-500"></div>
-                </div>
-                <div class="text-xs text-green-700 justify-between flex">
-                    <span>INTEGRITY</span>
-                    <span id="integrity-pct">100%</span>
-                </div>
-            </div>
+        <div id="interaction-prompt">[ CLICK TO CHECK ]</div>
+
+        <div id="controls">
+            <button class="btn btn-safe" onclick="makeDecision(true)">OPEN DOOR</button>
+            <button class="btn btn-danger" onclick="makeDecision(false)">LOCK DOOR</button>
+            <button class="btn" onclick="stepBack()">STEP BACK</button>
         </div>
-
-        <!-- Center: File Viewer -->
-        <div class="col-span-6 flex flex-col items-center justify-center relative border border-green-900/30 bg-gray-900/20 p-8">
-            
-            <!-- The File Content -->
-            <div id="file-viewer" class="w-full h-full flex flex-col items-center justify-center text-center relative overflow-hidden">
-                <div id="file-loader" class="absolute inset-0 bg-black flex items-center justify-center z-10 hidden">
-                    <span class="animate-pulse">LOADING_DATA_FRAGMENT...</span>
-                </div>
-
-                <div id="content-display" class="w-full">
-                    <!-- Dynamic Content Injected Here -->
-                    <div class="border-2 border-dashed border-green-800 p-8 mb-4 w-64 h-64 mx-auto flex items-center justify-center bg-black">
-                        <svg class="w-16 h-16 text-green-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    </div>
-                    <div class="text-left font-mono text-sm space-y-2 max-w-md mx-auto">
-                        <p><span class="text-green-700">FILENAME:</span> <span id="file-name">IMG_2004_CORRUPT.jpg</span></p>
-                        <p><span class="text-green-700">SIZE:</span> <span id="file-size">402 KB</span></p>
-                        <p><span class="text-green-700">ORIGIN:</span> <span id="file-origin">USER_UNKNOWN</span></p>
-                        <p class="mt-4 p-2 border border-green-900 text-green-400 bg-black/50" id="file-desc">
-                            Analysis: Image data heavily fragmented. Contains traces of biological textures.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Controls -->
-            <div class="absolute bottom-8 flex gap-4 w-full justify-center px-8">
-                <button onclick="purgeFile()" class="btn-purge flex-1 py-4 text-2xl font-bold tracking-widest hover:bg-red-900 hover:border-red-500 hover:text-red-500">
-                    [ PURGE ]
-                </button>
-                <button onclick="keepFile()" class="btn-purge flex-1 py-4 text-2xl font-bold tracking-widest opacity-50 hover:opacity-100">
-                    [ ARCHIVE ]
-                </button>
-            </div>
-        </div>
-
-        <!-- Right Sidebar: Stats & Glitch Meter -->
-        <div class="col-span-3 border-l border-green-900 pl-4 flex flex-col justify-between">
-            <div>
-                <h3 class="text-lg underline mb-4">QUEUE</h3>
-                <ul class="space-y-2 text-sm text-green-800 font-mono">
-                    <li class="flex justify-between"><span>PENDING:</span> <span id="pending-count">842</span></li>
-                    <li class="flex justify-between"><span>PURGED:</span> <span class="text-green-500" id="purged-count">0</span></li>
-                    <li class="flex justify-between"><span>ERRORS:</span> <span class="text-red-900" id="error-count">0</span></li>
-                </ul>
-            </div>
-
-            <div class="bg-black border border-green-900 p-2 text-xs text-green-900 font-mono">
-                DEBUG CONSOLE:
-                <br>> init_core
-                <br>> connecting_to_node...
-                <br>> <span id="console-output" class="text-green-500 animate-pulse">awaiting_input</span>
-            </div>
-        </div>
-
     </div>
 
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <h1>THE PEEPHOLE</h1>
+        <p>APARTMENT 402 - MANDELA COUNTY</p>
+        <br>
+        <p>You can <b>Move the Mouse</b> to look around your apartment.</p>
+        <br>
+        <p>Rules:</p>
+        <p>1. When you hear a knock, click to check the peephole.</p>
+        <p>2. Study the visitor. <b>Humans</b> look normal.</p>
+        <p>3. <b>Alternates</b> have flaws (long arms, floating, wrong heads, etc).</p>
+        <p>4. Survive until 6:00 AM.</p>
+        <br>
+        <button class="btn" onclick="startGame()">WAKE UP</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color:red">KILLED</h1>
+        <p id="death-reason">An alternate entered your home.</p>
+        <button class="btn" onclick="location.reload()">RETRY</button>
+    </div>
+
+    <div id="win-screen" class="screen hidden">
+        <h1 style="color:green">SURVIVED</h1>
+        <p>The sun is rising. You are safe.</p>
+        <button class="btn" onclick="location.reload()">REST</button>
+    </div>
+
+    <div id="game-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // --- Audio System (Web Audio API) ---
-        let audioCtx;
-        
-        function initAudio() {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
-            
-            // Create a background hum
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.value = 50;
-            gain.gain.value = 0.01; // Very quiet
-            
-            // Lowpass filter for muffled sound
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 120;
-
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-        }
-
-        function playSound(type) {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            
-            const now = audioCtx.currentTime;
-
-            if (type === 'click') {
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(800, now);
-                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-                gain.gain.setValueAtTime(0.05, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            } 
-            else if (type === 'purge') {
-                // Harsh static burst
-                const bufferSize = audioCtx.sampleRate * 0.2; // 0.2 seconds
-                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
-                }
-                const noise = audioCtx.createBufferSource();
-                noise.buffer = buffer;
-                const noiseGain = audioCtx.createGain();
-                noiseGain.gain.setValueAtTime(0.1, now);
-                noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-                noise.connect(noiseGain);
-                noiseGain.connect(audioCtx.destination);
-                noise.start(now);
-            }
-            else if (type === 'scare') {
-                // Sudden high pitch drop
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(1000, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.5);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(now);
-                osc.stop(now + 0.5);
-            }
-            else if (type === 'msg') {
-                // Soft beep
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(1200, now);
-                gain.gain.setValueAtTime(0.05, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            }
-        }
-
-        // --- Game State ---
-        let gameState = {
-            purged: 0,
-            sanity: 100,
-            eventIndex: 0
+        // --- GAME CONFIG & STATE ---
+        const CONFIG = {
+            sanityDrop: 25,
+            hoursToWin: 6,
+            knockChance: 0.01
         };
 
-        const fileNames = [
-            "IMG_2991_BACKYARD.jpg", "LOG_CHAT_EXPORT.txt", "AUDIO_REC_SCREAM.wav", 
-            "VID_2023_BASEMENT.mp4", "SYS_DUMP_001.dat", "USER_PROFILE_CLARA.json",
-            "SECURITY_CAM_04.mov", "UNKNOWN_ENTITY.png", "EYES_OPEN.jpg", "DONT_LOOK.txt"
-        ];
+        let state = {
+            hour: 0,
+            sanity: 100,
+            phase: 'menu', // menu, idle, knocking, viewing, resolving
+            activeVisitor: null,
+            viewing: false
+        };
 
-        const descriptions = [
-            "Metadata indicates file was modified 3 seconds ago.",
-            "Audio spectrum analysis detects low frequency breathing.",
-            "Image contains excessive noise patterns resembling faces.",
-            "Text file contains only the binary code for 'HELP'.",
-            "Video file length: 00:00:00. File size: 4GB. Anomaly detected.",
-            "Location data matches your current IP address.",
-            "This file refuses to be deleted. Try again."
-        ];
+        let mouse = { x: 0, y: 0 };
+        let targetRotation = { x: 0, y: 0 };
 
-        // --- Story Script ---
-        const script = [
-            { count: 1, type: 'chat', text: "SYSTEM: Session started. Quota: 50 files.", sender: 'system' },
-            { count: 3, type: 'chat', text: "ADMIN: Hey, new guy. Just clear the red flags. Don't open them.", sender: 'system' },
-            { count: 6, type: 'glitch', intensity: 'low' },
-            { count: 8, type: 'chat', text: "HELP_BOT: Why are you deleting these?", sender: 'ai' },
-            { count: 12, type: 'chat', text: "HELP_BOT: I live in those files.", sender: 'ai' },
-            { count: 15, type: 'glitch', intensity: 'medium' },
-            { count: 16, type: 'visual', text: "LOOK BEHIND YOU" }, // Changes file description
-            { count: 20, type: 'chat', text: "HELP_BOT: I can see you through your webcam.", sender: 'ai' },
-            { count: 21, type: 'chat', text: "HELP_BOT: Nice room. Is that a window to your left?", sender: 'ai' },
-            { count: 25, type: 'glitch', intensity: 'high' },
-            { count: 28, type: 'chat', text: "ADMIN: User 402, why is your heart rate elevated?", sender: 'system' },
-            { count: 35, type: 'scare' }
-        ];
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x111111, 2, 12);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
 
-        // --- Core Logic ---
+        document.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+        });
+
+        // --- ASSETS / TEXTURES ---
+        function createNoiseTexture(color) {
+            const size = 128;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            ctx.fillRect(0,0,size,size);
+            for(let i=0; i<1000; i++) {
+                ctx.fillStyle = Math.random()>0.5 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
+                ctx.fillRect(Math.random()*size, Math.random()*size, 2, 2);
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const wallMat = new THREE.MeshStandardMaterial({ map: createNoiseTexture('#666666'), roughness: 0.8 });
+        const floorMat = new THREE.MeshStandardMaterial({ map: createNoiseTexture('#443322'), roughness: 0.7 });
+        const doorMat = new THREE.MeshStandardMaterial({ map: createNoiseTexture('#4a2e2b'), roughness: 0.6 });
+
+        // --- ROOM BUILDER ---
+        const roomGroup = new THREE.Group();
+        scene.add(roomGroup);
+
+        // Floor
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), floorMat);
+        floor.rotation.x = -Math.PI/2;
+        roomGroup.add(floor);
+
+        // Ceiling
+        const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), wallMat);
+        ceiling.rotation.x = Math.PI/2;
+        ceiling.position.y = 3;
+        roomGroup.add(ceiling);
+
+        // Walls
+        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), wallMat);
+        backWall.position.set(0, 1.5, 4);
+        backWall.rotation.y = Math.PI;
+        roomGroup.add(backWall);
+
+        const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), wallMat);
+        leftWall.position.set(-4, 1.5, 0);
+        leftWall.rotation.y = Math.PI/2;
+        roomGroup.add(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), wallMat);
+        rightWall.position.set(4, 1.5, 0);
+        rightWall.rotation.y = -Math.PI/2;
+        roomGroup.add(rightWall);
+
+        // Door Wall
+        const doorWallLeft = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3), wallMat);
+        doorWallLeft.position.set(-2.3, 1.5, -3);
+        roomGroup.add(doorWallLeft);
+
+        const doorWallRight = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3), wallMat);
+        doorWallRight.position.set(2.3, 1.5, -3);
+        roomGroup.add(doorWallRight);
+
+        const doorWallTop = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.8), wallMat);
+        doorWallTop.position.set(0, 2.6, -3);
+        roomGroup.add(doorWallTop);
+
+        // The Door
+        const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.1), doorMat);
+        door.position.set(0, 1.1, -3);
+        roomGroup.add(door);
+
+        // Door Knob
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05), new THREE.MeshStandardMaterial({color:0xffd700}));
+        knob.position.set(0.45, 1.0, -2.9);
+        roomGroup.add(knob);
+
+        // Peephole
+        const peephole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15), new THREE.MeshStandardMaterial({color:0x111}));
+        peephole.rotation.x = Math.PI/2;
+        peephole.position.set(0, 1.6, -3);
+        roomGroup.add(peephole);
+
+        // Furniture (Decor)
+        // Table
+        const table = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 1.2), new THREE.MeshStandardMaterial({color:0x3e2723}));
+        table.position.set(-2.5, 0.4, 1.5);
+        roomGroup.add(table);
+
+        // Lamp on Table
+        const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 0.4), new THREE.MeshStandardMaterial({color:0x222}));
+        lampBase.position.set(-2.5, 0.9, 1.5);
+        roomGroup.add(lampBase);
+
+        // Rug
+        const rug = new THREE.Mesh(new THREE.PlaneGeometry(3, 4), new THREE.MeshStandardMaterial({color: 0x551111, roughness: 1}));
+        rug.rotation.x = -Math.PI/2;
+        rug.position.set(0, 0.01, 0.5);
+        roomGroup.add(rug);
+
+        // Poster
+        const poster = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2), new THREE.MeshStandardMaterial({color: 0x224466}));
+        poster.position.set(3.9, 1.8, 0);
+        poster.rotation.y = -Math.PI/2;
+        roomGroup.add(poster);
+
+        
+        // --- HALLWAY ---
+        const hallGroup = new THREE.Group();
+        scene.add(hallGroup);
+        
+        const hallFloor = new THREE.Mesh(new THREE.PlaneGeometry(4, 10), new THREE.MeshStandardMaterial({color:0x222}));
+        hallFloor.rotation.x = -Math.PI/2;
+        hallFloor.position.set(0, -0.01, -8);
+        hallGroup.add(hallFloor);
+
+        const hallWallL = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), new THREE.MeshStandardMaterial({color:0x444}));
+        hallWallL.rotation.y = Math.PI/2;
+        hallWallL.position.set(-2, 1.5, -8);
+        hallGroup.add(hallWallL);
+
+        const hallWallR = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), new THREE.MeshStandardMaterial({color:0x444}));
+        hallWallR.rotation.y = -Math.PI/2;
+        hallWallR.position.set(2, 1.5, -8);
+        hallGroup.add(hallWallR);
+
+        // --- LIGHTING ---
+        // Room Light (Warm, Brighter now)
+        const roomLight = new THREE.PointLight(0xffaa77, 0.8, 10); 
+        roomLight.position.set(0, 2.5, 1);
+        roomGroup.add(roomLight);
+
+        // Hallway Light (Cold, Bright, Flickering)
+        const hallLight = new THREE.PointLight(0xaaccff, 0.8, 8);
+        hallLight.position.set(0, 2.8, -6);
+        hallGroup.add(hallLight);
+
+        // Ambient (Brighter to remove void feel)
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // --- CHARACTER GENERATOR ---
+
+        function createHumanoid(isMonster) {
+            const group = new THREE.Group();
+            group.position.set(0, 0, -4); // Standing outside door
+
+            // Traits
+            const heightMod = 1 + (Math.random() * 0.1);
+            const skinColor = isMonster && Math.random() > 0.8 ? 0x333333 : 0xffccaa; // Rare black skin for monster
+            const shirtColor = Math.random() * 0xffffff;
+            
+            // Materials
+            const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.4 });
+            const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.8 });
+            const pantMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.9 });
+
+            // FLAWS (0 = None)
+            const flaws = {
+                longArms: isMonster && Math.random() > 0.6,
+                bigHead: isMonster && Math.random() > 0.7,
+                tinyHead: isMonster && Math.random() > 0.8,
+                longNeck: isMonster && Math.random() > 0.6,
+                floating: isMonster && Math.random() > 0.7,
+                noFace: isMonster && Math.random() > 0.8
+            };
+
+            // Legs
+            const legGeo = new THREE.BoxGeometry(0.15, 0.9, 0.15);
+            const legL = new THREE.Mesh(legGeo, pantMat);
+            legL.position.set(-0.2, 0.45, 0);
+            const legR = new THREE.Mesh(legGeo, pantMat);
+            legR.position.set(0.2, 0.45, 0);
+            group.add(legL, legR);
+
+            // Torso
+            const torsoH = 0.7 * heightMod;
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, torsoH, 0.25), shirtMat);
+            torso.position.y = 0.9 + (torsoH/2);
+            group.add(torso);
+
+            // Neck
+            const neckLen = flaws.longNeck ? 0.4 : 0.1;
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, neckLen), skinMat);
+            neck.position.y = 0.9 + torsoH + (neckLen/2);
+            group.add(neck);
+
+            // Head
+            let headSize = 0.25;
+            if (flaws.bigHead) headSize = 0.45;
+            if (flaws.tinyHead) headSize = 0.12;
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), skinMat);
+            head.position.y = 0.9 + torsoH + neckLen + (headSize/2);
+            group.add(head);
+
+            // Face
+            if (!flaws.noFace) {
+                // Eyes
+                const eyeGeo = new THREE.BoxGeometry(0.05, 0.02, 0.01);
+                const eyeMat = new THREE.MeshBasicMaterial({color: 0x000000});
+                
+                const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+                eyeL.position.set(-0.08, 0, headSize/2 + 0.001);
+                
+                const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+                eyeR.position.set(0.08, 0, headSize/2 + 0.001);
+
+                // MONSTER EYES
+                if (isMonster && Math.random() > 0.5) {
+                    eyeL.rotation.z = Math.PI / 4; // Tilted eye
+                    eyeR.scale.y = 4; // Vertical slit
+                }
+
+                head.add(eyeL, eyeR);
+            }
+
+            // Arms
+            const armLen = flaws.longArms ? 1.4 : 0.7;
+            const armGeo = new THREE.BoxGeometry(0.12, armLen, 0.12);
+            
+            const armL = new THREE.Mesh(armGeo, shirtMat);
+            armL.position.set(-0.35, 0.9 + torsoH - 0.1 - (armLen/2), 0);
+            // Slight angle
+            armL.rotation.z = 0.1;
+
+            const armR = new THREE.Mesh(armGeo, shirtMat);
+            armR.position.set(0.35, 0.9 + torsoH - 0.1 - (armLen/2), 0);
+            armR.rotation.z = -0.1;
+
+            group.add(armL, armR);
+
+            // Floating Logic
+            if(flaws.floating) {
+                group.position.y = 0.5;
+            }
+
+            // Store animation data
+            group.userData = {
+                isMonster: isMonster,
+                flaws: flaws,
+                baseY: group.position.y,
+                breathSpeed: isMonster && Math.random() > 0.5 ? 20 : 2 // Fast jitter or normal breath
+            };
+
+            return group;
+        }
+
+
+        // --- GAMEPLAY LOGIC ---
 
         function startGame() {
-            document.getElementById('start-overlay').classList.add('hidden');
-            document.getElementById('game-container').classList.remove('opacity-0');
-            initAudio();
-            updateClock();
-            generateNextFile();
-            addChat("SYSTEM: Connection established.", 'system');
+            document.getElementById('start-screen').classList.add('hidden');
+            state.hour = 0;
+            state.sanity = 100;
+            state.phase = 'idle';
+            updateUI();
             
-            // Noise Canvas Loop
-            const canvas = document.getElementById('noise-canvas');
-            const ctx = canvas.getContext('2d');
+            // Initial Camera Position
+            camera.position.set(0, 1.6, 2);
+            camera.rotation.set(0, 0, 0); // Reset rotation for mouse look
             
-            const resize = () => {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
+            scheduleEvent();
+            requestAnimationFrame(animate);
+        }
+
+        function updateUI() {
+            const time = state.hour === 0 ? "12:00 AM" : `${state.hour}:00 AM`;
+            document.getElementById('clock').innerText = time;
+            document.getElementById('sanity').innerText = `SANITY: ${state.sanity}%`;
+            document.getElementById('sanity').style.color = state.sanity < 40 ? 'red' : '#aaa';
+        }
+
+        function scheduleEvent() {
+            if(state.phase !== 'idle') return;
+            const delay = 3000 + Math.random() * 5000;
+            setTimeout(() => {
+                if(state.phase === 'idle') startKnocking();
+            }, delay);
+        }
+
+        function startKnocking() {
+            state.phase = 'knocking';
+            
+            // Create Entity
+            if(state.activeVisitor) scene.remove(state.activeVisitor);
+            const isMonster = Math.random() > 0.5; // 50/50 chance
+            state.activeVisitor = createHumanoid(isMonster);
+            scene.add(state.activeVisitor);
+
+            // UI Hint
+            const prompt = document.getElementById('interaction-prompt');
+            prompt.innerText = "* KNOCK KNOCK * (Click to Check)";
+            prompt.classList.add('knocking-text');
+            prompt.style.opacity = 1;
+
+            // Click listener for the door area
+            window.addEventListener('mousedown', onCheckDoor);
+        }
+
+        function onCheckDoor() {
+            if(state.phase !== 'knocking') return;
+            
+            window.removeEventListener('mousedown', onCheckDoor);
+            state.phase = 'viewing';
+            state.viewing = true;
+
+            // Animate Camera to Peephole
+            const targetPos = new THREE.Vector3(0, 1.6, -2.8);
+            const startPos = camera.position.clone();
+            const startRot = camera.rotation.clone();
+            
+            let alpha = 0;
+            const anim = () => {
+                alpha += 0.05;
+                if (alpha < 1) {
+                    camera.position.lerpVectors(startPos, targetPos, alpha);
+                    // Slerp rotation to 0,0,0 (facing door)
+                    camera.rotation.x = startRot.x * (1 - alpha);
+                    camera.rotation.y = startRot.y * (1 - alpha);
+                    requestAnimationFrame(anim);
+                } else {
+                    camera.rotation.set(0,0,0);
+                    // Switch to Fisheye UI
+                    document.getElementById('peephole-overlay').style.opacity = 1;
+                    document.getElementById('controls').style.opacity = 1;
+                    document.getElementById('interaction-prompt').style.opacity = 0;
+                    
+                    // Widen FOV for fisheye effect
+                    camera.fov = 120;
+                    camera.updateProjectionMatrix();
+                }
             };
-            window.addEventListener('resize', resize);
-            resize();
+            anim();
+        }
 
-            function noise() {
-                const w = canvas.width;
-                const h = canvas.height;
-                const idata = ctx.createImageData(w, h);
-                const buffer32 = new Uint32Array(idata.data.buffer);
-                const len = buffer32.length;
+        function stepBack() {
+            document.getElementById('peephole-overlay').style.opacity = 0;
+            document.getElementById('controls').style.opacity = 0;
+            
+            state.viewing = false;
+            camera.fov = 75; // Restore normal FOV
+            camera.updateProjectionMatrix();
 
-                for (let i = 0; i < len; i++) {
-                    if (Math.random() < 0.1) {
-                        buffer32[i] = 0xff000000;
+            const targetPos = new THREE.Vector3(0, 1.6, 2);
+            const startPos = camera.position.clone();
+            let alpha = 0;
+            const anim = () => {
+                alpha += 0.05;
+                if (alpha < 1) {
+                    camera.position.lerpVectors(startPos, targetPos, alpha);
+                    requestAnimationFrame(anim);
+                } else {
+                    // Re-enable click to check
+                    window.addEventListener('mousedown', onCheckDoor);
+                    document.getElementById('interaction-prompt').style.opacity = 1;
+                }
+            };
+            anim();
+        }
+
+        function makeDecision(openDoor) {
+            state.phase = 'resolving';
+            document.getElementById('controls').style.opacity = 0;
+            document.getElementById('peephole-overlay').style.opacity = 0;
+
+            const isMonster = state.activeVisitor.userData.isMonster;
+
+            if (openDoor) {
+                if (isMonster) {
+                    // LOSE
+                    triggerJumpscare();
+                } else {
+                    // SAFE
+                    showFeedback("VISITOR ALLOWED", "green");
+                    endRound();
+                }
+            } else {
+                // Locked Door
+                if (isMonster) {
+                    // GOOD JOB
+                    showFeedback("THREAT BLOCKED", "green");
+                    endRound();
+                } else {
+                    // MISTAKE
+                    state.sanity -= CONFIG.sanityDrop;
+                    showFeedback("NEIGHBOR IGNORED", "red");
+                    if(state.sanity <= 0) {
+                         gameOver("You went insane from guilt.");
+                    } else {
+                        endRound();
                     }
                 }
-                ctx.putImageData(idata, 0, 0);
-                requestAnimationFrame(noise);
             }
-            noise();
         }
 
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString();
-            setTimeout(updateClock, 1000);
+        function endRound() {
+            // Move camera back
+            state.viewing = false;
+            camera.fov = 75;
+            camera.updateProjectionMatrix();
+            camera.position.set(0, 1.6, 2);
+
+            // Remove entity
+            if(state.activeVisitor) {
+                scene.remove(state.activeVisitor);
+                state.activeVisitor = null;
+            }
+
+            // Advance time
+            state.hour++;
+            updateUI();
+
+            if (state.hour >= CONFIG.hoursToWin) {
+                document.getElementById('win-screen').classList.remove('hidden');
+            } else {
+                state.phase = 'idle';
+                scheduleEvent();
+            }
         }
 
-        function generateNextFile() {
-            const loader = document.getElementById('file-loader');
-            loader.classList.remove('hidden');
-            
+        function showFeedback(text, color) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            div.style.position = 'absolute';
+            div.style.top = '30%';
+            div.style.width = '100%';
+            div.style.textAlign = 'center';
+            div.style.color = color;
+            div.style.fontSize = '40px';
+            div.style.fontWeight = 'bold';
+            div.style.textShadow = '0 0 10px black';
+            div.style.zIndex = 50;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 2000);
+        }
+
+        function triggerJumpscare() {
+            const j = document.getElementById('jumpscare');
+            j.classList.remove('hidden');
+            // Play a sound if we had audio, but visually shake
+            let shake = 0;
+            const sInt = setInterval(() => {
+                shake = (Math.random() - 0.5) * 20;
+                j.style.transform = `translate(${shake}px, ${shake}px)`;
+            }, 50);
+
             setTimeout(() => {
-                loader.classList.add('hidden');
+                clearInterval(sInt);
+                document.getElementById('game-over-screen').classList.remove('hidden');
+            }, 1000);
+        }
+
+        function gameOver(reason) {
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('death-reason').innerText = reason;
+        }
+
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            // CAMERA CONTROLS (Mouse Look) - Only when not in peephole mode
+            if (!state.viewing && state.phase !== 'menu') {
+                // Calculate target rotation based on mouse pos
+                // Limit yaw (y) to 45 deg, pitch (x) to 20 deg
+                const targetY = mouse.x * -0.8;
+                const targetX = mouse.y * -0.3;
+
+                camera.rotation.y += (targetY - camera.rotation.y) * 0.1;
+                camera.rotation.x += (targetX - camera.rotation.x) * 0.1;
+            }
+
+            // Hallway Light Flicker
+            if(Math.random() > 0.9) {
+                hallLight.intensity = Math.random();
+            } else {
+                hallLight.intensity = 0.8;
+            }
+
+            // Visitor Animation
+            if(state.activeVisitor) {
+                const data = state.activeVisitor.userData;
                 
-                // Randomize Content
-                const name = fileNames[Math.floor(Math.random() * fileNames.length)];
-                const desc = descriptions[Math.floor(Math.random() * descriptions.length)];
-                
-                document.getElementById('file-name').innerText = name;
-                document.getElementById('file-desc').innerText = "Analysis: " + desc;
-                document.getElementById('file-size').innerText = Math.floor(Math.random() * 800) + " KB";
-                
-                // Randomly corrupt the text sometimes
-                if (Math.random() > 0.7) {
-                    document.getElementById('file-name').classList.add('text-glitch');
-                } else {
-                    document.getElementById('file-name').classList.remove('text-glitch');
+                // Breathing
+                const breath = Math.sin(time * data.breathSpeed) * 0.01;
+                state.activeVisitor.scale.y = 1 + breath;
+                state.activeVisitor.scale.x = 1 - breath;
+
+                // Floating flaw
+                if (data.flaws.floating) {
+                    state.activeVisitor.position.y = data.baseY + Math.sin(time * 3) * 0.1;
                 }
 
-            }, 400); // Fake load time
-        }
-
-        function purgeFile() {
-            playSound('purge');
-            gameState.purged++;
-            
-            // Visual feedback
-            const btn = document.activeElement;
-            const container = document.getElementById('game-container');
-            
-            // Screen flash
-            container.style.backgroundColor = '#1a0505';
-            setTimeout(() => container.style.backgroundColor = 'rgba(0,0,0,0.8)', 100);
-
-            // Update stats
-            document.getElementById('purged-count').innerText = gameState.purged;
-            document.getElementById('pending-count').innerText = 842 - gameState.purged;
-
-            checkEvents();
-            generateNextFile();
-        }
-
-        function keepFile() {
-            playSound('click');
-            // Punish player for keeping files?
-            gameState.sanity -= 5;
-            updateSanity();
-            generateNextFile();
-        }
-
-        function updateSanity() {
-            const bar = document.getElementById('sanity-bar');
-            bar.style.width = gameState.sanity + "%";
-            document.getElementById('integrity-pct').innerText = gameState.sanity + "%";
-            
-            if (gameState.sanity < 50) {
-                bar.classList.replace('bg-green-600', 'bg-red-600');
-                document.getElementById('connection-warning').classList.remove('hidden');
+                // Twitch flaw
+                if (data.isMonster && Math.random() > 0.95) {
+                    state.activeVisitor.rotation.y = (Math.random()-0.5) * 0.2;
+                } else {
+                    state.activeVisitor.rotation.y = 0;
+                }
             }
+
+            renderer.render(scene, camera);
         }
 
-        function checkEvents() {
-            // Find events that match current count
-            const events = script.filter(e => e.count === gameState.purged);
-            
-            events.forEach(e => {
-                setTimeout(() => {
-                    triggerEvent(e);
-                }, 1000); // Slight delay for dramatic effect
-            });
-        }
-
-        function triggerEvent(e) {
-            if (e.type === 'chat') {
-                addChat(e.text, e.sender);
-                playSound('msg');
-            }
-            else if (e.type === 'glitch') {
-                triggerGlitch(e.intensity);
-            }
-            else if (e.type === 'visual') {
-                document.getElementById('file-desc').innerHTML = `<span class="text-red-500 font-bold text-xl shake-hard">${e.text}</span>`;
-                playSound('scare');
-            }
-            else if (e.type === 'scare') {
-                playSound('scare');
-                document.body.style.filter = "invert(1)";
-                setTimeout(() => document.body.style.filter = "invert(0)", 100);
-                addChat("SYSTEM: CRITICAL FAILURE", "ai");
-            }
-        }
-
-        function addChat(msg, type) {
-            const chatBox = document.getElementById('chat-box');
-            const p = document.createElement('div');
-            p.innerText = `> ${msg}`;
-            p.className = `chat-message ${type === 'system' ? 'chat-system' : 'chat-ai'}`;
-            chatBox.prepend(p); // Add to top
-        }
-
-        function triggerGlitch(intensity) {
-            const body = document.body;
-            
-            if (intensity === 'low') {
-                body.style.transform = "skewX(2deg)";
-                setTimeout(() => body.style.transform = "none", 100);
-            } 
-            else if (intensity === 'medium') {
-                body.classList.add('shake-hard');
-                document.getElementById('game-container').style.filter = "hue-rotate(90deg)";
-                playSound('scare');
-                setTimeout(() => {
-                    body.classList.remove('shake-hard');
-                    document.getElementById('game-container').style.filter = "none";
-                }, 500);
-            }
-            else if (intensity === 'high') {
-                const everything = document.querySelectorAll('*');
-                everything.forEach(el => el.style.color = 'red');
-                playSound('scare');
-                setTimeout(() => {
-                    everything.forEach(el => el.style.color = '');
-                }, 200);
-            }
-        }
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
     </script>
 </body>
